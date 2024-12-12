@@ -1,0 +1,80 @@
+<ctdidm:ObjectPolicy xmlns:ctdidm="http://www.memority.com/citadel/idm/1_0"
+                     xmlns:search="http://www.memority.com/toolkit/search-expression/1_0"
+                     id="identity-common-departure-job">
+    <name>identity-common-departure-job</name>
+    <description/>
+    <activation>SCHEDULED</activation>
+    <pageSize>10</pageSize>
+    <executionPlan>
+        <scheduleType>CRON</scheduleType>
+        <cron>0 30 0 1/1 * ? *</cron>
+        <interval>0</interval>
+        <timeZone>Europe/Paris</timeZone>
+    </executionPlan>
+    <scope objectKind="IDENTITY" type="EXPRESSION">
+        <searchExpression>
+            <search:And>
+                <search:Prop name="status" op="IN">
+                    <value script="false">RETIRED</value>
+                    <value script="false">NORMAL</value>
+                </search:Prop>
+                <search:Prop name="activationUntil" op="IN_NEXT">
+                    <value script="false">P7D</value>
+                </search:Prop>
+                <search:Not>
+                    <search:Prop name="activationUntil" op="IN_NEXT">
+                        <value script="false">P6D</value>
+                    </search:Prop>
+                </search:Not>
+            </search:And>
+        </searchExpression>
+        <objectTypes>
+            <objectType>internal</objectType>
+        </objectTypes>
+    </scope>
+    <active>true</active>
+    <actions>
+        <action>
+            <script><![CDATA[
+                import com.memority.citadel.shared.api.im.ApiObject
+                import com.memority.toolkit.rule.api.ActionOutcome
+
+                // Internal
+
+                // internal notification
+                // Define notification
+
+                LOG.debug("Identity Life Cycle Notification job - {} - Send notification DEP1", OBJECT.id)
+                def notifBuilder2 = NOTIFY.buildNotification("LEV1-warning-departure-emailDefinition")
+                notifBuilder2.send()
+                def notifBuilder = NOTIFY.buildNotification("DEP1-internal-departure-emailDefinition")
+                def notifBuilder3 = NOTIFY.buildNotification("LEV2-manager-postponeDate-emailDefinition")
+
+                if (OBJECT.manager) {
+                    FIND.identity().withAttributesProjection("email", "commonName").withId(OBJECT.manager).each {
+                        ApiObject it ->
+                            notifBuilder.withActor(it.commonName).
+                                    role("manager").
+                                    email(it.email).
+                                    end()
+
+                    }
+                    FIND.identity().withAttributesProjection("email", "commonName").withId(OBJECT.manager).each {
+                        ApiObject it ->
+                            notifBuilder3.withActor(it.commonName).
+                                    role("manager").
+                                    email(it.email).
+                                    end()
+
+                    }
+                }
+                // Send the notification
+
+                notifBuilder.send()
+                notifBuilder3.send()
+                ActionOutcome.success()
+                ]]></script>
+        </action>
+    </actions>
+    <secondaryActions/>
+</ctdidm:ObjectPolicy>
